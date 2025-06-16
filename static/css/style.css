@@ -1,72 +1,53 @@
-/* static/style.css - Merged and Enhanced Version */
-
-/* --- 1. Import Google Fonts (Sarabun & Inter) --- */
-@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-
-/* --- 2. CSS Variables for easy color management --- */
-:root {
-    /* Colors from user's theme */
-    --primary-color: #2a9d8f;
-    --secondary-color: #264653;
-    --bg-color: #eef7f9; /* Lightened version of user's bg for softness */
-    
-    /* Standard colors from original design */
-    --success-color: #198754;
-    --danger-color: #dc3545;
-    --warning-color: #ffc107;
-    --light-color: #ffffff;
-    --dark-color: #333;
-
-    /* Font and Layout variables */
-    --font-family-thai: 'Sarabun', sans-serif;
-    --font-family-eng: 'Inter', sans-serif;
-    --box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
-    --border-radius: 0.75rem; /* 12px */
-}
-
-/* --- 3. General Body Styling --- */
+/* General Body and Font Styling */
 body {
-    font-family: var(--font-family-thai);
+    font-family: 'Inter', sans-serif; /* Using Inter font for modern look */
     margin: 0;
     padding: 0;
-    background-color: var(--bg-color);
-    color: var(--dark-color);
+    background-color: #e0f2f7; /* Light blue background */
+    color: #333;
     line-height: 1.6;
 }
 
-/* --- 4. Header and Navigation Bar --- */
-/* Using user's header style as a base */
-.navbar {
-    background: linear-gradient(90deg, #2a9d8f, #264653);
-    padding: 1rem 1.5rem;
+/* Header and Navigation */
+header {
+    background: linear-gradient(90deg, #2a9d8f, #264653); /* Gradient for header */
+    color: #fff;
+    padding: 1.2em 0;
+    text-align: center;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.navbar-brand {
-    font-family: var(--font-family-eng);
-    font-weight: 700;
-    font-size: 1.5rem;
+nav {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px; /* Space between nav items */
 }
 
-.navbar-dark .nav-link {
-    color: rgba(255, 255, 255, 0.85);
-    transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
-    font-weight: 500;
+nav a {
+    color: #fff;
+    text-decoration: none;
+    padding: 0.8em 1.5em;
+    border-radius: 25px; /* More rounded corners for nav buttons */
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.15); /* Slightly transparent background */
 }
 
-.navbar-dark .nav-link:hover, .navbar-dark .nav-link.active {
-    color: #ffffff;
-    transform: translateY(-2px);
+nav a:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px); /* Slight lift on hover */
 }
 
-/* --- 5. Main Content Area --- */
-main.container {
+/* Main Content Area */
+main {
     padding: 30px;
-    background-color: var(--light-color);
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    animation: fadeIn 0.8s ease-out; /* Keep user's fade-in animation */
+    max-width: 1000px; /* Max width for content */
+    margin: 30px auto;
+    background-color: #ffffff;
+    border-radius: 12px; /* Smoother rounded corners */
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.8s ease-out; /* Fade in animation for main content */
 }
 
 @keyframes fadeIn {
@@ -75,139 +56,198 @@ main.container {
 }
 
 h1, h2 {
-    color: var(--secondary-color);
+    color: #264653; /* Darker blue for headings */
     text-align: center;
     margin-bottom: 25px;
     font-weight: 700;
 }
 
-/* --- 6. Card Styling --- */
-.card {
-    border: 1px solid #cce7e9;
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
-}
-
-.card-header {
-    background-color: #f8fcfd; /* Light blue from user's form style */
-    border-bottom: 1px solid #cce7e9;
-    font-weight: 700;
-}
-
-/* --- 7. Form and Input Styling --- */
+/* Forms Styling */
 form {
+    background-color: #f8fcfd; /* Very light blue for forms */
     padding: 25px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    border: 1px solid #cce7e9; /* Soft border */
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05); /* Subtle inner shadow */
 }
 
 label {
+    display: block;
     margin-bottom: 10px;
     font-weight: bold;
-    color: #4a6c82;
+    color: #4a6c82; /* Slightly darker text for labels */
 }
 
-.form-control, .form-select {
-    border-radius: 8px;
+input[type="text"],
+input[type="number"],
+input[type="date"],
+select {
+    width: calc(100% - 24px); /* Adjust width for padding */
     padding: 12px;
-    border: 1px solid #a8dadc;
+    margin-bottom: 20px;
+    border: 1px solid #a8dadc; /* Softer border color */
+    border-radius: 8px; /* Rounded input fields */
+    box-sizing: border-box;
+    font-size: 16px;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.form-control:focus, .form-select:focus {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 8px rgba(42, 157, 143, 0.25);
-    outline: none;
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+select:focus {
+    border-color: #2a9d8f; /* Highlight on focus */
+    box-shadow: 0 0 8px rgba(42, 157, 143, 0.2);
+    outline: none; /* Remove default outline */
 }
 
-
-/* --- 8. Button Styling --- */
-.btn {
+/* Buttons */
+button {
+    background: linear-gradient(135deg, #2a9d8f, #21887e); /* Gradient button */
+    color: white;
     padding: 12px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 8px; /* Rounded buttons */
     cursor: pointer;
-    font-size: 16px;
+    font-size: 17px;
     font-weight: bold;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3); /* Button shadow */
+    display: inline-block; /* Allow multiple buttons on one line */
+    margin-right: 10px; /* Spacing for multiple buttons */
 }
 
-.btn-primary {
-    background: linear-gradient(135deg, #2a9d8f, #21887e);
-    color: white;
-}
-.btn-primary:hover {
+button:hover {
     background: linear-gradient(135deg, #21887e, #1a6b63);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px); /* Lift effect */
+    box-shadow: 0 6px 15px rgba(0, 123, 255, 0.4);
 }
 
-/* Specific buttons */
-.btn-danger { background-color: var(--danger-color); border-color: var(--danger-color); }
-.btn-warning { background-color: var(--warning-color); border-color: var(--warning-color); color: #212529; }
-.btn-secondary { background-color: var(--secondary-color); border-color: var(--secondary-color); }
+button:active {
+    transform: translateY(0); /* Press effect */
+    box-shadow: 0 2px 5px rgba(0, 123, 255, 0.2);
+}
 
-/* --- 9. Table Styling --- */
-.table {
+/* Table Styling */
+table {
+    width: 100%;
     border-collapse: collapse;
     margin-top: 25px;
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: var(--box-shadow);
+    border-radius: 10px; /* Rounded table corners */
+    overflow: hidden; /* Ensures rounded corners apply to content */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Table shadow */
 }
 
-.table th {
-    background-color: var(--secondary-color);
+th, td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0f2f7; /* Lighter border for rows */
+}
+
+th {
+    background-color: #264653; /* Darker blue for table headers */
     color: #fff;
     font-weight: bold;
     text-transform: uppercase;
     font-size: 14px;
-    padding: 15px;
 }
 
-.table td {
-     padding: 15px;
-     border-bottom: 1px solid #e0f2f7;
+tr:nth-child(even) {
+    background-color: #f0fafa; /* Lighter alternating row color */
 }
 
-.table tbody tr:nth-child(even) {
-    background-color: #f8fcfd;
+tr:hover {
+    background-color: #e0f8ff; /* Highlight row on hover */
 }
 
-.table tbody tr:hover {
-    background-color: #e9f8fb;
-    cursor: pointer;
-}
-
-.filter-row input {
-    border-radius: 6px;
-}
-
-/* --- 10. Footer Styling --- */
-footer.footer {
+/* Flash Messages */
+.flashes {
+    list-style-type: none;
+    padding: 0;
+    margin: 20px 0;
     text-align: center;
-    padding: 1.5em 0;
-    margin-top: 30px;
-    background: var(--secondary-color);
-    color: var(--bg-color);
-    font-size: 0.9em;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* --- 11. Responsive Design --- */
+.flashes li {
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    animation: slideIn 0.5s ease-out; /* Animation for messages */
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.flashes .success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.flashes .error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.flashes .warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* Specific Input Fields */
+.sn-input-field {
+    width: calc(50% - 15px); /* Adjusted width for better spacing */
+    display: inline-block;
+    margin-right: 15px;
+}
+
+#searchSN {
+    width: calc(100% - 24px); /* Full width adjusted for padding */
+    padding: 12px;
+    margin-bottom: 20px;
+    border: 1px solid #a8dadc;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-    main.container {
+    nav a {
+        display: block;
+        margin: 5px auto; /* Center buttons vertically */
+        width: 80%; /* Make them wider on small screens */
+    }
+
+    main {
         margin: 15px;
         padding: 20px;
     }
 
-    .table th, .table td {
+    th, td {
         padding: 10px;
         font-size: 14px;
     }
+
+    .sn-input-field {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
+/* Footer Styling */
+footer {
+    text-align: center;
+    padding: 1.5em 0;
+    margin-top: 30px;
+    background: #264653; /* Darker blue for footer */
+    color: #e0f2f7; /* Light blue text */
+    font-size: 0.9em;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
