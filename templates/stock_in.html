@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+
+{% block title %}รับสินค้าเข้าสโตร์{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    <h1>รับสินค้าเข้าสโตร์</h1>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('stock_in') }}" method="POST">
+                        <div class="mb-3">
+                            <label for="product_id" class="form-label">เลือกสินค้า:</label>
+                            <select id="product_id" name="product_id" class="form-select" required>
+                                <option value="" disabled selected>-- กรุณาเลือกสินค้า --</option>
+                                {% for product in products %}
+                                    <option value="{{ product.id }}">{{ product.name }} (Mat: {{ product.mat_code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="serial_numbers_bulk" class="form-label">Serial Number (SN) ที่ต้องการรับเข้า:</label>
+                            <!-- เพิ่ม id="serial_numbers_bulk" เพื่อให้ scripts.js ทำงาน -->
+                            <textarea id="serial_numbers_bulk" name="serial_numbers_bulk" class="form-control" rows="8" placeholder="กรอก SN ทีละบรรทัด&#10;ตัวอย่าง:&#10;SN001&#10;SN002&#10;SN003" required></textarea>
+                            <!-- เพิ่ม id="sn_counter" สำหรับแสดงจำนวน SN -->
+                            <div id="sn_counter" class="form-text">0 รายการ</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="date_received" class="form-label">วันที่รับเข้า:</label>
+                                <!-- id="date_received" จะถูกใช้โดย scripts.js เพื่อตั้งวันที่ปัจจุบัน -->
+                                <input type="date" id="date_received" name="date_received" class="form-control" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="receiver_name" class="form-label">ชื่อผู้รับผิดชอบ:</label>
+                                <input type="text" id="receiver_name" name="receiver_name" class="form-control" required>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">บันทึกการรับเข้า</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ไม่จำเป็นต้องมี <script> ที่นี่อีกต่อไป -->
+<!-- Logic ทั้งหมดจะถูกจัดการในไฟล์ scripts.js ที่เชื่อมต่อใน layout.html -->
+
+{% endblock %}

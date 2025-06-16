@@ -1,0 +1,15 @@
+# .gitignore
+# --------------------
+# Virtual Environment
+venv/
+.venv/
+
+# Instance Folder (เก็บไฟล์ db และ credentials ที่เป็นความลับ)
+instance/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS files
+.DS_Store
