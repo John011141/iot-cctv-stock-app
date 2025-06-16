@@ -29,7 +29,7 @@ except OSError:
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
-# --- Google Sheet Helper ---
+# --- Google Sheet Helper Function ---
 def update_google_sheet():
     """
     ดึงข้อมูลทั้งหมดจาก SQLite แล้วเขียนทับลงใน Google Sheet
@@ -43,9 +43,10 @@ def update_google_sheet():
 
         gc = gspread.service_account(filename=creds_path)
         spreadsheet = gc.open(current_app.config['GSHEET_NAME'])
-        
-        main_worksheet = spreadsheet.sheet1
         db = get_db()
+        
+        # --- 1. อัปเดตชีตหลัก (ข้อมูลทั้งหมด) ---
+        main_worksheet = spreadsheet.sheet1
         all_items = db.execute("""
             SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                    ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
@@ -65,6 +66,25 @@ def update_google_sheet():
         main_worksheet.clear()
         main_worksheet.update('A1', data_to_write, value_input_option='USER_ENTERED')
         
+        # --- 2. อัปเดตชีตสรุปยอดตามช่าง ---
+        try:
+            summary_worksheet = spreadsheet.worksheet("สรุปยอดตามช่าง")
+        except gspread.exceptions.WorksheetNotFound:
+            summary_worksheet = spreadsheet.add_worksheet(title="สรุปยอดตามช่าง", rows="100", cols="2")
+
+        technician_summary = db.execute("""
+            SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
+            WHERE status = 'Issued' AND issuer_name IS NOT NULL AND issuer_name != ''
+            GROUP BY issuer_name ORDER BY item_count DESC
+        """).fetchall()
+
+        summary_header = ["ชื่อช่างผู้เบิก", "จำนวนที่เบิกจ่าย (ชิ้น)"]
+        summary_data_to_write = [summary_header] + [[item['issuer_name'], item['item_count']] for item in technician_summary]
+
+        summary_worksheet.clear()
+        summary_worksheet.update('A1', summary_data_to_write, value_input_option='USER_ENTERED')
+
+        print("Successfully updated Google Sheet (Main and Summary).")
         flash('อัปเดตข้อมูลไปยัง Google Sheet เรียบร้อยแล้ว!', 'info')
 
     except Exception as e:
@@ -87,11 +107,7 @@ def close_db(e=None):
     if db is not None:
         db.close()
 
-# *** FIX: Reverted to self-contained init_db function ***
 def init_db():
-    """
-    ล้างข้อมูลเก่าและสร้างตารางใหม่ทั้งหมด
-    """
     db = get_db()
     db.executescript("""
         DROP TABLE IF EXISTS inventory_items;
@@ -119,11 +135,9 @@ def init_db():
 
 @app.cli.command('init-db')
 def init_db_command():
-    """สร้าง CLI command ชื่อ init-db"""
     with app.app_context():
         init_db()
     click.echo('Initialized the database.')
-
 
 # --- Utility ---
 def allowed_file(filename):
@@ -154,9 +168,7 @@ def dashboard():
         total_products = db.execute("SELECT COUNT(id) FROM products").fetchone()[0]
         total_items = db.execute("SELECT COUNT(id) FROM inventory_items").fetchone()[0]
     except (sqlite3.OperationalError, TypeError):
-        # Handle case where tables don't exist yet during init
-        total_products = 0
-        total_items = 0
+        total_products, total_items = 0, 0
 
     return render_template('dashboard.html', 
                            status_summary=status_summary, 
@@ -192,7 +204,6 @@ def export_csv():
             item['issuer_name'] or '', str(item['date_issued']) if item['date_issued'] else ''
         ]
         cw.writerow(row)
-
     output = si.getvalue()
     return Response(
         output,
