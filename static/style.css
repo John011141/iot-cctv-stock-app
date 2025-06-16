@@ -33,6 +33,19 @@ body {
     background-attachment: fixed;
 }
 
+/* เพิ่ม lớp overlay เพื่อทำให้เนื้อหาอ่านง่ายขึ้น */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.6); /* สีขาวโปร่งแสง */
+    backdrop-filter: blur(5px); /* เอฟเฟกต์เบลอ */
+    z-index: -1;
+}
+
 /* --- 4. Navigation Bar --- */
 .navbar {
     background: linear-gradient(90deg, #343a40 0%, #212529 100%) !important;
