@@ -55,8 +55,8 @@
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <!-- Added 'detail-table' class for specific styling -->
-                <table class="table table-bordered table-hover detail-table">
+                <!-- *** FIX: Using Bootstrap classes for alignment directly *** -->
+                <table class="table table-bordered table-hover text-center">
                     <thead class="thead-light">
                         <!-- แถวสำหรับชื่อคอลัมน์ -->
                         <tr>
@@ -109,4 +109,47 @@
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() if super }}
+<script>
+// เพิ่มโค้ด JavaScript สำหรับการยืนยันก่อนลบสต็อกทั้งหมด
+document.getElementById('clearStockForm').addEventListener('submit', function(event) {
+    var confirmation = confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างสต็อกทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้');
+    if (!confirmation) {
+        event.preventDefault(); // ยกเลิกการส่งฟอร์มถ้าผู้ใช้ไม่ยืนยัน
+    }
+});
+
+// เพิ่มโค้ด JavaScript สำหรับการกรองตาราง
+document.addEventListener('DOMContentLoaded', function() {
+    const filters = document.querySelectorAll('.column-filter');
+    const tableBody = document.getElementById('inventoryTableBody');
+    const rows = Array.from(tableBody.querySelectorAll('tr'));
+
+    filters.forEach(filter => {
+        filter.addEventListener('keyup', function() {
+            const filterValues = Array.from(filters).map(f => f.value.toLowerCase());
+
+            rows.forEach(row => {
+                let isVisible = true;
+                const cells = row.querySelectorAll('td');
+                
+                filterValues.forEach((filterValue, index) => {
+                    const colIndex = filters[index].getAttribute('data-col-index');
+                    if (filterValue && cells[colIndex]) {
+                        const cellText = cells[colIndex].textContent || cells[colIndex].innerText;
+                        if (cellText.toLowerCase().indexOf(filterValue) === -1) {
+                            isVisible = false;
+                        }
+                    }
+                });
+                row.style.display = isVisible ? '' : 'none';
+            });
+        });
+    });
+});
+</script>
 {% endblock %}
