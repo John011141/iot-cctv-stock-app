@@ -1,0 +1,105 @@
+/* static/style.css */
+
+/* --- 1. Import Google Font (Sarabun) --- */
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap');
+
+/* --- 2. CSS Variables for easy color management --- */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #198754;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+    --bg-color: #f4f7f6;
+    --font-family: 'Sarabun', sans-serif;
+    --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --border-radius: 0.5rem;
+}
+
+/* --- 3. General Body Styling --- */
+body {
+    font-family: var(--font-family);
+    background-color: var(--bg-color);
+    color: var(--dark-color);
+    padding-top: 70px; /* Adjust for fixed navbar */
+}
+
+/* --- 4. Navigation Bar --- */
+.navbar {
+    background: linear-gradient(90deg, #343a40 0%, #212529 100%) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-weight: 700;
+}
+
+.nav-link {
+    transition: color 0.2s ease-in-out, transform 0.2s ease;
+}
+
+.nav-link.active, .nav-link:hover {
+    color: var(--primary-color) !important;
+    transform: translateY(-1px);
+}
+
+/* --- 5. Card Styling --- */
+.card {
+    border: none;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+    background-color: var(--light-color);
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+/* --- 6. Button Styling --- */
+.btn {
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* --- 7. Table Styling --- */
+.table {
+    box-shadow: var(--box-shadow);
+    border-radius: var(--border-radius);
+    overflow: hidden; /* ทำให้ border-radius มีผลกับตาราง */
+}
+
+.table thead {
+    background-color: var(--dark-color);
+    color: white;
+}
+
+.filter-row input {
+    border: 1px solid #ced4da;
+    font-size: 0.9em;
+}
+
+/* --- 8. Footer Styling --- */
+.footer {
+    padding: 1.5rem 0;
+    margin-top: 3rem;
+    background-color: #e9ecef;
+    text-align: center;
+    color: var(--secondary-color);
+    border-top: 1px solid #dee2e6;
+}
