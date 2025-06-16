@@ -4,21 +4,24 @@ import sqlite3
 import os
 import uuid
 import click
-from flask import Flask, render_template, request, redirect, url_for, flash, g, current_app
+import io
+import csv
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash, g, current_app, Response
+)
 from werkzeug.utils import secure_filename
 import gspread
 
 app = Flask(__name__)
-# --- Configuration (Best Practice) ---
+# --- Configuration ---
 app.config.from_mapping(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'a_very_long_and_complex_secret_key_for_your_app'),
     DATABASE=os.path.join(app.instance_path, 'inventory.db'),
     UPLOAD_FOLDER='static/images',
-    # !!! สำคัญ: แก้ไขชื่อชีตให้ตรงกับที่คุณสร้างไว้ !!!
     GSHEET_NAME='My CCTV Stock'
 )
 
-# ตรวจสอบและสร้างโฟลเดอร์ instance และ upload หากยังไม่มี
+# ตรวจสอบและสร้างโฟลเดอร์
 try:
     os.makedirs(app.instance_path)
 except OSError:
@@ -26,18 +29,13 @@ except OSError:
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
-# --- Google Sheet Helper Function ---
+# --- Google Sheet Helper ---
 def update_google_sheet():
-    """
-    ดึงข้อมูลทั้งหมดจาก SQLite แล้วเขียนทับลงใน Google Sheet
-    """
     try:
         creds_path = os.path.join(current_app.instance_path, 'credentials.json')
         if not os.path.exists(creds_path):
-            print("Google Sheets Warning: ไม่พบไฟล์ credentials.json ในโฟลเดอร์ instance")
             flash('ตั้งค่า Google Sheets ไม่สำเร็จ: ไม่พบไฟล์ credentials.json', 'warning')
             return
-
         gc = gspread.service_account(filename=creds_path)
         spreadsheet = gc.open(current_app.config['GSHEET_NAME'])
         
@@ -62,23 +60,17 @@ def update_google_sheet():
         main_worksheet.clear()
         main_worksheet.update('A1', data_to_write, value_input_option='USER_ENTERED')
         
-        print("Successfully updated Google Sheet.")
         flash('อัปเดตข้อมูลไปยัง Google Sheet เรียบร้อยแล้ว!', 'info')
 
-    except gspread.exceptions.SpreadsheetNotFound:
-        print(f"Google Sheets Error: ไม่พบชีตชื่อ '{current_app.config['GSHEET_NAME']}'")
-        flash(f"ไม่พบ Google Sheet ชื่อ '{current_app.config['GSHEET_NAME']}' กรุณาตรวจสอบชื่อและสิทธิ์การเข้าถึง", 'danger')
     except Exception as e:
-        print(f"Google Sheets Error: {e}")
         flash(f'เกิดข้อผิดพลาดในการเชื่อมต่อกับ Google Sheets: {e}', 'danger')
 
 
-# --- Database Helper Functions ---
+# --- Database Helpers ---
 def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(
-            current_app.config['DATABASE'],
-            detect_types=sqlite3.PARSE_DECLTYPES
+            current_app.config['DATABASE'], detect_types=sqlite3.PARSE_DECLTYPES
         )
         g.db.row_factory = sqlite3.Row
     return g.db
@@ -89,49 +81,102 @@ def close_db(e=None):
     if db is not None:
         db.close()
 
-def init_db():
-    db = get_db()
-    db.executescript("""
-        DROP TABLE IF EXISTS inventory_items;
-        DROP TABLE IF EXISTS products;
-
-        CREATE TABLE products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            mat_code TEXT NOT NULL UNIQUE,
-            image_url TEXT
-        );
-
-        CREATE TABLE inventory_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id INTEGER NOT NULL,
-            serial_number TEXT NOT NULL UNIQUE,
-            status TEXT NOT NULL,
-            date_received DATE,
-            receiver_name TEXT,
-            date_issued DATE,
-            issuer_name TEXT,
-            FOREIGN KEY (product_id) REFERENCES products (id)
-        );
-    """)
-
 @app.cli.command('init-db')
 def init_db_command():
-    with app.app_context():
-        init_db()
+    db = get_db()
+    with current_app.open_resource('schema.sql') as f:
+        db.executescript(f.read().decode('utf8'))
     click.echo('Initialized the database.')
 
-# --- Utility Functions ---
+
+# --- Utility ---
 def allowed_file(filename):
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# --- Routes (Website Paths) ---
+# --- Routes ---
 @app.route('/')
 def index():
-    return redirect(url_for('stock_overview'))
+    return redirect(url_for('dashboard'))
 
+# NEW: Dashboard Route
+@app.route('/dashboard')
+def dashboard():
+    db = get_db()
+    
+    # Data for Status Pie Chart
+    status_summary_rows = db.execute("""
+        SELECT status, COUNT(id) as count
+        FROM inventory_items
+        GROUP BY status
+    """).fetchall()
+    # *** FIX: Convert list of Row objects to list of dictionaries ***
+    status_summary = [dict(row) for row in status_summary_rows]
+
+
+    # Data for Products Bar Chart
+    product_summary_rows = db.execute("""
+        SELECT p.name, COUNT(ii.id) as count
+        FROM products p
+        LEFT JOIN inventory_items ii ON p.id = ii.product_id
+        GROUP BY p.id
+        ORDER BY count DESC
+        LIMIT 10
+    """).fetchall()
+    # *** FIX: Convert list of Row objects to list of dictionaries ***
+    product_summary = [dict(row) for row in product_summary_rows]
+
+
+    # Key statistics
+    total_products = db.execute("SELECT COUNT(id) FROM products").fetchone()[0]
+    total_items = db.execute("SELECT COUNT(id) FROM inventory_items").fetchone()[0]
+    
+    return render_template('dashboard.html', 
+                           status_summary=status_summary, 
+                           product_summary=product_summary,
+                           total_products=total_products,
+                           total_items=total_items)
+
+@app.route('/stock_overview')
+def stock_overview():
+    db = get_db()
+    summary = db.execute("SELECT p.name, p.mat_code, p.image_url, COUNT(CASE WHEN ii.status = 'In Stock' THEN 1 END) AS in_stock_count, COUNT(CASE WHEN ii.status = 'Issued' THEN 1 END) AS issued_count, COUNT(ii.id) AS total_count FROM products p LEFT JOIN inventory_items ii ON p.id = ii.product_id GROUP BY p.id ORDER BY p.name").fetchall()
+    all_items = db.execute("SELECT p.mat_code, ii.serial_number, p.name, ii.status, ii.receiver_name, ii.date_issued, ii.issuer_name FROM inventory_items ii JOIN products p ON ii.product_id = p.id ORDER BY p.mat_code, ii.serial_number").fetchall()
+    return render_template('stock_overview.html', summary=summary, all_items=all_items)
+
+# NEW: Export to CSV Route
+@app.route('/export_csv')
+def export_csv():
+    db = get_db()
+    all_items = db.execute("""
+        SELECT p.mat_code, ii.serial_number, p.name, ii.status,
+               ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
+        FROM inventory_items ii JOIN products p ON ii.product_id = p.id
+        ORDER BY p.mat_code, ii.serial_number
+    """).fetchall()
+
+    si = io.StringIO()
+    cw = csv.writer(si)
+    header = ["เลข Mat", "SN", "ชื่อสินค้า", "สถานะ", "ผู้รับผิดชอบ (รับเข้า)", "วันที่รับเข้า", "ช่างผู้เบิก", "วันที่เบิกจ่าย"]
+    cw.writerow(header)
+    for item in all_items:
+        row = [
+            item['mat_code'], item['serial_number'], item['name'], item['status'],
+            item['receiver_name'] or '', str(item['date_received']) if item['date_received'] else '',
+            item['issuer_name'] or '', str(item['date_issued']) if item['date_issued'] else ''
+        ]
+        cw.writerow(row)
+
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-disposition":
+                 "attachment; filename=stock_export.csv"})
+
+# (Other routes like stock_in, stock_out, manage_products remain the same)
+# ...
 @app.route('/stock_in', methods=['GET', 'POST'])
 def stock_in():
     db = get_db()
@@ -206,15 +251,6 @@ def stock_out():
     
     products_in_stock = db.execute("SELECT DISTINCT p.id, p.name, p.mat_code FROM products p JOIN inventory_items ii ON p.id = ii.product_id WHERE ii.status = 'In Stock' ORDER BY p.name").fetchall()
     return render_template('stock_out.html', products=products_in_stock)
-
-@app.route('/stock_overview')
-def stock_overview():
-    db = get_db()
-    summary = db.execute("SELECT p.name, p.mat_code, p.image_url, COUNT(CASE WHEN ii.status = 'In Stock' THEN 1 END) AS in_stock_count, COUNT(CASE WHEN ii.status = 'Issued' THEN 1 END) AS issued_count, COUNT(ii.id) AS total_count FROM products p LEFT JOIN inventory_items ii ON p.id = ii.product_id GROUP BY p.id ORDER BY p.name").fetchall()
-    all_items = db.execute("SELECT p.mat_code, ii.serial_number, p.name, ii.status, ii.receiver_name, ii.date_issued, ii.issuer_name FROM inventory_items ii JOIN products p ON ii.product_id = p.id ORDER BY p.mat_code, ii.serial_number").fetchall()
-    return render_template('stock_overview.html', 
-                           summary=summary, 
-                           all_items=all_items)
 
 @app.route('/clear_all_stock', methods=['POST'])
 def clear_all_stock():
