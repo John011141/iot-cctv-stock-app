@@ -148,33 +148,10 @@ def allowed_file(filename):
 # --- Routes ---
 @app.route('/')
 def index():
-    return redirect(url_for('dashboard'))
+    # เปลี่ยนหน้าแรกให้ไปที่หน้าภาพรวมสต็อก
+    return redirect(url_for('stock_overview'))
 
-@app.route('/dashboard')
-def dashboard():
-    db = get_db()
-    
-    status_summary_rows = db.execute("SELECT status, COUNT(id) as count FROM inventory_items GROUP BY status").fetchall()
-    status_summary = [dict(row) for row in status_summary_rows]
-
-    product_summary_rows = db.execute("""
-        SELECT p.name, COUNT(ii.id) as count FROM products p
-        LEFT JOIN inventory_items ii ON p.id = ii.product_id
-        GROUP BY p.id ORDER BY count DESC LIMIT 10
-    """).fetchall()
-    product_summary = [dict(row) for row in product_summary_rows]
-
-    try:
-        total_products = db.execute("SELECT COUNT(id) FROM products").fetchone()[0]
-        total_items = db.execute("SELECT COUNT(id) FROM inventory_items").fetchone()[0]
-    except (sqlite3.OperationalError, TypeError):
-        total_products, total_items = 0, 0
-
-    return render_template('dashboard.html', 
-                           status_summary=status_summary, 
-                           product_summary=product_summary,
-                           total_products=total_products,
-                           total_items=total_items)
+# ฟังก์ชัน /dashboard ถูกลบออกไปแล้ว
 
 @app.route('/stock_overview')
 def stock_overview():
@@ -210,10 +187,9 @@ def export_csv():
     cw.writerow(header)
 
     for item in all_items:
-        # *** FIX: Format long numbers as text for Excel ***
         row = [
-            f"=\"{item['mat_code']}\"", # บังคับให้เป็น Text
-            f"=\"{item['serial_number']}\"", # บังคับให้เป็น Text
+            f"=\"{item['mat_code']}\"",
+            f"=\"{item['serial_number']}\"",
             item['name'],
             item['status'],
             item['receiver_name'] or '', 
