@@ -1,0 +1,134 @@
+{% extends "layout.html" %}
+
+{% block title %}แดชบอร์ด{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">แดชบอร์ดสรุปภาพรวม</h1>
+
+    <!-- Key Statistics Cards -->
+    <div class="row">
+        <div class="col-md-6 col-lg-6 mb-4">
+            <div class="card text-white bg-primary h-100">
+                <div class="card-body">
+                    <h5 class="card-title">สินค้าทั้งหมดในระบบ</h5>
+                    <p class="card-text display-4">{{ total_products }}</p>
+                    <p class="card-text">ประเภท</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-6 mb-4">
+            <div class="card text-white bg-success h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Serial Number ทั้งหมด</h5>
+                    <p class="card-text display-4">{{ total_items }}</p>
+                    <p class="card-text">รายการ</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    กราฟสัดส่วนสถานะสินค้า
+                </div>
+                <div class="card-body">
+                    <canvas id="statusPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    กราฟ 10 อันดับสินค้าในสต็อก
+                </div>
+                <div class="card-body">
+                    <canvas id="productsBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Data from Flask
+    const statusData = {{ status_summary | tojson }};
+    const productData = {{ product_summary | tojson }};
+
+    // 1. Status Pie Chart
+    const statusCtx = document.getElementById('statusPieChart');
+    if (statusCtx) {
+        new Chart(statusCtx, {
+            type: 'pie',
+            data: {
+                labels: statusData.map(row => row.status),
+                datasets: [{
+                    label: 'จำนวน',
+                    data: statusData.map(row => row.count),
+                    backgroundColor: [
+                        '#198754', // In Stock (Green)
+                        '#ffc107', // Issued (Yellow)
+                        '#6c757d'  // Other (Grey)
+                    ],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'สัดส่วนสถานะของอุปกรณ์ทั้งหมด'
+                    }
+                }
+            }
+        });
+    }
+
+    // 2. Products Bar Chart
+    const productCtx = document.getElementById('productsBarChart');
+    if (productCtx) {
+        new Chart(productCtx, {
+            type: 'bar',
+            data: {
+                labels: productData.map(row => row.name),
+                datasets: [{
+                    label: 'จำนวนอุปกรณ์ทั้งหมด',
+                    data: productData.map(row => row.count),
+                    backgroundColor: 'rgba(0, 123, 255, 0.6)',
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y', // ทำให้เป็นกราฟแท่งแนวนอน
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'จำนวนอุปกรณ์ตามประเภทสินค้า (10 อันดับแรก)'
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
