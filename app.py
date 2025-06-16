@@ -181,7 +181,17 @@ def stock_overview():
     db = get_db()
     summary = db.execute("SELECT p.name, p.mat_code, p.image_url, COUNT(CASE WHEN ii.status = 'In Stock' THEN 1 END) AS in_stock_count, COUNT(CASE WHEN ii.status = 'Issued' THEN 1 END) AS issued_count, COUNT(ii.id) AS total_count FROM products p LEFT JOIN inventory_items ii ON p.id = ii.product_id GROUP BY p.id ORDER BY p.name").fetchall()
     all_items = db.execute("SELECT p.mat_code, ii.serial_number, p.name, ii.status, ii.receiver_name, ii.date_issued, ii.issuer_name FROM inventory_items ii JOIN products p ON ii.product_id = p.id ORDER BY p.mat_code, ii.serial_number").fetchall()
-    return render_template('stock_overview.html', summary=summary, all_items=all_items)
+    
+    technician_summary = db.execute("""
+        SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
+        WHERE status = 'Issued' AND issuer_name IS NOT NULL AND issuer_name != ''
+        GROUP BY issuer_name ORDER BY item_count DESC
+    """).fetchall()
+    
+    return render_template('stock_overview.html', 
+                           summary=summary, 
+                           all_items=all_items,
+                           technician_summary=technician_summary)
 
 @app.route('/export_csv')
 def export_csv():
@@ -195,20 +205,32 @@ def export_csv():
 
     si = io.StringIO()
     cw = csv.writer(si)
+
     header = ["เลข Mat", "SN", "ชื่อสินค้า", "สถานะ", "ผู้รับผิดชอบ (รับเข้า)", "วันที่รับเข้า", "ช่างผู้เบิก", "วันที่เบิกจ่าย"]
     cw.writerow(header)
+
     for item in all_items:
+        # *** FIX: Format long numbers as text for Excel ***
         row = [
-            item['mat_code'], item['serial_number'], item['name'], item['status'],
-            item['receiver_name'] or '', str(item['date_received']) if item['date_received'] else '',
-            item['issuer_name'] or '', str(item['date_issued']) if item['date_issued'] else ''
+            f"=\"{item['mat_code']}\"", # บังคับให้เป็น Text
+            f"=\"{item['serial_number']}\"", # บังคับให้เป็น Text
+            item['name'],
+            item['status'],
+            item['receiver_name'] or '', 
+            str(item['date_received']) if item['date_received'] else '',
+            item['issuer_name'] or '', 
+            str(item['date_issued']) if item['date_issued'] else ''
         ]
         cw.writerow(row)
-    output = si.getvalue()
+
+    output_string = si.getvalue()
+    output_bytes = output_string.encode('utf-8-sig')
+    
     return Response(
-        output,
+        output_bytes,
         mimetype="text/csv",
-        headers={"Content-disposition": "attachment; filename=stock_export.csv"}
+        headers={"Content-disposition":
+                 "attachment; filename=stock_export.csv"}
     )
 
 @app.route('/stock_in', methods=['GET', 'POST'])
