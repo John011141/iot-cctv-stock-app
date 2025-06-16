@@ -1,4 +1,4 @@
-// static/scripts.js - Final and corrected version
+// static/scripts.js - Final version with auto-hiding alerts
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all functions on page load
@@ -8,23 +8,41 @@ document.addEventListener('DOMContentLoaded', function() {
     setupSerialNumberCounter();
     setupDefaultDate();
     setupInlineEditForm();
+    setupAutoHideAlerts(); // <-- เพิ่มฟังก์ชันใหม่
 });
+
+
+/**
+ * NEW: Automatically hides flash messages (alerts) after 4 seconds.
+ */
+function setupAutoHideAlerts() {
+    // เลือก alert ทุกอันที่มีปุ่มปิด
+    const alerts = document.querySelectorAll('.alert-dismissible');
+
+    alerts.forEach(function(alert) {
+        // ตั้งเวลาให้ทำงานหลังจาก 4000 มิลลิวินาที (4 วินาที)
+        setTimeout(function() {
+            // สร้าง Bootstrap Alert instance เพื่อใช้เมธอด .close()
+            // ซึ่งจะจัดการเรื่องอนิเมชันการเลือนหาย (fade out) และลบ element ออกไปให้เอง
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 4000); 
+    });
+}
+
 
 /**
  * Sets up confirmation dialogs for destructive actions.
  */
 function setupConfirmationModals() {
-    // Confirmation for clearing the entire stock
     const clearStockForm = document.getElementById('clearStockForm');
     if (clearStockForm) {
         clearStockForm.addEventListener('submit', function(event) {
             if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการล้างสต็อกทั้งหมด? การกระทำนี้ไม่สามารถย้อนกลับได้!')) {
-                event.preventDefault(); // Stop form submission if user cancels
+                event.preventDefault();
             }
         });
     }
-
-    // Confirmation for deleting a single product using event delegation
     document.body.addEventListener('submit', function(event) {
         if (event.target.matches('.delete-product-form')) {
             if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้?')) {
@@ -45,7 +63,7 @@ function setupTableFilters() {
     const techColumnFilter = document.getElementById('technicianColumnFilter');
 
     if (!tableBody || filterInputs.length === 0) {
-        return; // Exit if necessary elements are not on the page
+        return;
     }
 
     const applyFilters = () => {
@@ -73,21 +91,16 @@ function setupTableFilters() {
             }
             row.style.display = isRowVisible ? '' : 'none';
 
-            // Count visible rows for the filtered technician
             if (isRowVisible && techColumnFilter && techColumnFilter.value) {
-                const techCell = row.cells[6]; // Technician column
-                if (techCell && techCell.textContent.toUpperCase().includes(techColumnFilter.value.toUpperCase())) {
-                   visibleCountForTech++;
-                }
+                visibleCountForTech++;
             }
         }
         
-        // Show/hide and update the summary footer
         if (techColumnFilter && techColumnFilter.value) {
-            summaryFooter.style.display = 'table-footer-group'; // Show the footer
+            summaryFooter.style.display = 'table-footer-group';
             filteredTechCount.textContent = `${visibleCountForTech} ชิ้น`;
         } else {
-            summaryFooter.style.display = 'none'; // Hide the footer
+            summaryFooter.style.display = 'none';
         }
     };
 
@@ -104,7 +117,7 @@ function setupImagePreview() {
     const imagePreview = document.getElementById('image_preview_container');
     
     if (!imageInput || !imagePreview) {
-        return; // Exit if the elements are not on the current page
+        return;
     }
 
     imageInput.addEventListener('change', function() {
@@ -112,10 +125,9 @@ function setupImagePreview() {
         if (file) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Set the src of the <img> tag to the selected file's data URL
                 imagePreview.src = e.target.result;
             }
-            reader.readAsDataURL(file); // Read the file to trigger the onload event
+            reader.readAsDataURL(file);
         }
     });
 }
@@ -133,7 +145,7 @@ function setupSerialNumberCounter() {
         counter.textContent = `${lines.length} รายการ`;
     };
     textarea.addEventListener('input', updateCounter);
-    updateCounter(); // Initial count on page load
+    updateCounter();
 }
 
 /**
@@ -165,7 +177,6 @@ function setupInlineEditForm() {
     const submitBtn = document.getElementById('submit-btn');
     const cancelBtn = document.getElementById('cancel-edit-btn');
     
-    // Function to reset the form to "Add New" mode
     const resetFormToAddMode = () => {
         formTitle.textContent = 'เพิ่มสินค้าใหม่';
         submitBtn.textContent = 'เพิ่มสินค้า';
@@ -177,28 +188,23 @@ function setupInlineEditForm() {
         cancelBtn.style.display = 'none';
     };
 
-    // Add event listeners to all "Edit" buttons
     document.querySelectorAll('.edit-product-btn').forEach(button => {
         button.addEventListener('click', function() {
-            // Switch form to "Edit" mode
             formTitle.textContent = 'แก้ไขสินค้า';
             submitBtn.textContent = 'บันทึกการแก้ไข';
             submitBtn.className = 'btn btn-warning';
             cancelBtn.style.display = 'inline-block';
 
-            // Populate form with data from the button's data-* attributes
             actionInput.value = 'edit';
             productIdInput.value = this.dataset.id;
             document.getElementById('name').value = this.dataset.name;
             document.getElementById('mat_code').value = this.dataset.mat_code;
             document.getElementById('image_preview_container').src = this.dataset.image_url || 'https://placehold.co/200x200/eeeeee/aaaaaa?text=Preview';
-            document.getElementById('product_image_input').value = ''; // Clear file input
+            document.getElementById('product_image_input').value = '';
 
-            // Scroll to the form for better user experience
             formCard.scrollIntoView({ behavior: 'smooth' });
         });
     });
 
-    // Add event listener to the "Cancel Edit" button
     if (cancelBtn) cancelBtn.addEventListener('click', resetFormToAddMode);
 }
