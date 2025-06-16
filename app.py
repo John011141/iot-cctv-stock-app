@@ -18,7 +18,7 @@ app.config.from_mapping(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'a_very_long_and_complex_secret_key_for_your_app'),
     DATABASE=os.path.join(app.instance_path, 'inventory.db'),
     UPLOAD_FOLDER='static/images',
-    GSHEET_NAME='My CCTV Stock'
+    GSHEET_NAME='My CCTV Stock' #! สำคัญ: แก้ไขชื่อชีตให้ตรงกับที่คุณสร้างไว้
 )
 
 # ตรวจสอบและสร้างโฟลเดอร์
@@ -31,11 +31,16 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # --- Google Sheet Helper ---
 def update_google_sheet():
+    """
+    ดึงข้อมูลทั้งหมดจาก SQLite แล้วเขียนทับลงใน Google Sheet
+    """
     try:
         creds_path = os.path.join(current_app.instance_path, 'credentials.json')
         if not os.path.exists(creds_path):
+            print("Google Sheets Warning: ไม่พบไฟล์ credentials.json ในโฟลเดอร์ instance")
             flash('ตั้งค่า Google Sheets ไม่สำเร็จ: ไม่พบไฟล์ credentials.json', 'warning')
             return
+
         gc = gspread.service_account(filename=creds_path)
         spreadsheet = gc.open(current_app.config['GSHEET_NAME'])
         
@@ -63,6 +68,7 @@ def update_google_sheet():
         flash('อัปเดตข้อมูลไปยัง Google Sheet เรียบร้อยแล้ว!', 'info')
 
     except Exception as e:
+        print(f"Google Sheets Error: {e}")
         flash(f'เกิดข้อผิดพลาดในการเชื่อมต่อกับ Google Sheets: {e}', 'danger')
 
 
@@ -81,11 +87,41 @@ def close_db(e=None):
     if db is not None:
         db.close()
 
+# *** FIX: Reverted to self-contained init_db function ***
+def init_db():
+    """
+    ล้างข้อมูลเก่าและสร้างตารางใหม่ทั้งหมด
+    """
+    db = get_db()
+    db.executescript("""
+        DROP TABLE IF EXISTS inventory_items;
+        DROP TABLE IF EXISTS products;
+
+        CREATE TABLE products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            mat_code TEXT NOT NULL UNIQUE,
+            image_url TEXT
+        );
+
+        CREATE TABLE inventory_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            serial_number TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL,
+            date_received DATE,
+            receiver_name TEXT,
+            date_issued DATE,
+            issuer_name TEXT,
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        );
+    """)
+
 @app.cli.command('init-db')
 def init_db_command():
-    db = get_db()
-    with current_app.open_resource('schema.sql') as f:
-        db.executescript(f.read().decode('utf8'))
+    """สร้าง CLI command ชื่อ init-db"""
+    with app.app_context():
+        init_db()
     click.echo('Initialized the database.')
 
 
@@ -100,38 +136,28 @@ def allowed_file(filename):
 def index():
     return redirect(url_for('dashboard'))
 
-# NEW: Dashboard Route
 @app.route('/dashboard')
 def dashboard():
     db = get_db()
     
-    # Data for Status Pie Chart
-    status_summary_rows = db.execute("""
-        SELECT status, COUNT(id) as count
-        FROM inventory_items
-        GROUP BY status
-    """).fetchall()
-    # *** FIX: Convert list of Row objects to list of dictionaries ***
+    status_summary_rows = db.execute("SELECT status, COUNT(id) as count FROM inventory_items GROUP BY status").fetchall()
     status_summary = [dict(row) for row in status_summary_rows]
 
-
-    # Data for Products Bar Chart
     product_summary_rows = db.execute("""
-        SELECT p.name, COUNT(ii.id) as count
-        FROM products p
+        SELECT p.name, COUNT(ii.id) as count FROM products p
         LEFT JOIN inventory_items ii ON p.id = ii.product_id
-        GROUP BY p.id
-        ORDER BY count DESC
-        LIMIT 10
+        GROUP BY p.id ORDER BY count DESC LIMIT 10
     """).fetchall()
-    # *** FIX: Convert list of Row objects to list of dictionaries ***
     product_summary = [dict(row) for row in product_summary_rows]
 
+    try:
+        total_products = db.execute("SELECT COUNT(id) FROM products").fetchone()[0]
+        total_items = db.execute("SELECT COUNT(id) FROM inventory_items").fetchone()[0]
+    except (sqlite3.OperationalError, TypeError):
+        # Handle case where tables don't exist yet during init
+        total_products = 0
+        total_items = 0
 
-    # Key statistics
-    total_products = db.execute("SELECT COUNT(id) FROM products").fetchone()[0]
-    total_items = db.execute("SELECT COUNT(id) FROM inventory_items").fetchone()[0]
-    
     return render_template('dashboard.html', 
                            status_summary=status_summary, 
                            product_summary=product_summary,
@@ -145,7 +171,6 @@ def stock_overview():
     all_items = db.execute("SELECT p.mat_code, ii.serial_number, p.name, ii.status, ii.receiver_name, ii.date_issued, ii.issuer_name FROM inventory_items ii JOIN products p ON ii.product_id = p.id ORDER BY p.mat_code, ii.serial_number").fetchall()
     return render_template('stock_overview.html', summary=summary, all_items=all_items)
 
-# NEW: Export to CSV Route
 @app.route('/export_csv')
 def export_csv():
     db = get_db()
@@ -172,11 +197,9 @@ def export_csv():
     return Response(
         output,
         mimetype="text/csv",
-        headers={"Content-disposition":
-                 "attachment; filename=stock_export.csv"})
+        headers={"Content-disposition": "attachment; filename=stock_export.csv"}
+    )
 
-# (Other routes like stock_in, stock_out, manage_products remain the same)
-# ...
 @app.route('/stock_in', methods=['GET', 'POST'])
 def stock_in():
     db = get_db()
@@ -187,9 +210,11 @@ def stock_in():
             date_received = request.form['date_received']
             serial_numbers_raw = request.form['serial_numbers_bulk']
             serial_numbers = [sn.strip() for sn in serial_numbers_raw.splitlines() if sn.strip()]
+
             if not serial_numbers:
                 flash('กรุณากรอก Serial Number อย่างน้อยหนึ่งหมายเลข', 'error')
                 return redirect(url_for('stock_in'))
+
             cursor = db.cursor()
             received_count = 0
             for sn in serial_numbers:
@@ -320,6 +345,7 @@ def manage_products():
         return redirect(url_for('manage_products'))
     products = db.execute("SELECT id, name, mat_code, image_url FROM products ORDER BY name").fetchall()
     return render_template('manage_products.html', products=products)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
