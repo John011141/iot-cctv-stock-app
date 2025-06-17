@@ -48,14 +48,14 @@ def update_google_sheet():
         # --- 1. อัปเดตชีตหลัก (ข้อมูลทั้งหมด) ---
         main_worksheet = spreadsheet.sheet1
         
-        # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับ Google Sheet ===
+        # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับ Google Sheet (เรียงจากเก่าไปใหม่) ===
         all_items = db.execute("""
             SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                    ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
             FROM inventory_items ii JOIN products p ON ii.product_id = p.id
             ORDER BY 
                 CASE WHEN ii.date_issued IS NULL THEN 1 ELSE 0 END, -- 1. จัดกลุ่มรายการที่ยังไม่เบิกไปไว้ข้างล่าง
-                ii.date_issued DESC,                               -- 2. เรียงตามวันที่เบิกจ่ายจากใหม่สุดไปเก่าสุด
+                ii.date_issued ASC,                                -- 2. เรียงตามวันที่เบิกจ่ายจากเก่าสุดไปใหม่สุด
                 p.mat_code,                                        -- 3. หากวันเดียวกัน ให้เรียงตามเลข Mat
                 ii.serial_number                                   -- 4. หาก Mat เดียวกัน ให้เรียงตาม SN
         """).fetchall()
@@ -193,6 +193,7 @@ def stock_overview():
 @app.route('/export_csv')
 def export_csv():
     db = get_db()
+    # For CSV export, let's keep the original sorting unless specified otherwise
     all_items = db.execute("""
         SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
@@ -314,7 +315,6 @@ def stock_return():
             action = request.form.get('action') 
 
             if action == 'return_to_stock':
-                # === นี่คือส่วนที่แก้ไขตามความต้องการล่าสุด ===
                 # คืนของดี: เปลี่ยนสถานะเป็น In Stock และล้างข้อมูลวันที่/ผู้เบิก
                 db.execute(
                     """UPDATE inventory_items 
@@ -326,7 +326,6 @@ def stock_return():
                 flash('รับคืนสินค้า (สภาพดี) เข้าสต็อกเรียบร้อยแล้ว!', 'success')
 
             elif action == 'mark_defective':
-                # === ส่วนนี้ทำงานถูกต้องตามความต้องการอยู่แล้ว ===
                 # คืนของเสีย: เปลี่ยนสถานะเป็น 'ของเสีย' และเก็บข้อมูลผู้เบิก/วันที่ไว้
                 db.execute(
                     "UPDATE inventory_items SET status = 'ของเสีย' WHERE id = ?",
@@ -345,7 +344,6 @@ def stock_return():
             db.rollback()
             flash(f'เกิดข้อผิดพลาดในการรับคืนสินค้า: {e}', 'error')
         
-        # ไม่ว่าจะเกิดอะไรขึ้น ให้กลับไปที่หน้าคืนของ
         return redirect(url_for('stock_return'))
 
     # สำหรับ GET request, แสดงรายการทั้งหมดที่ถูกเบิกจ่ายไปเพื่อรอการคืน
