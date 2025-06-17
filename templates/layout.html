@@ -14,21 +14,23 @@
 
     <title>{% block title %}{% endblock %} - IOT Stock Chonburi</title>
 
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
     <style>
         .flash-messages-container {
             position: fixed;
-            top: 5rem; /* ระยะห่างจากขอบบน (ปรับได้ตามความสูงของ Navbar) */
-            right: 1rem; /* ระยะห่างจากขอบขวา */
-            z-index: 1050; /* ค่า Z-index สูงๆ เพื่อให้แสดงทับส่วนอื่น */
+            top: 5rem;
+            right: 1rem;
+            z-index: 1050;
             width: auto;
-            max-width: 400px; /* ความกว้างสูงสุดของกล่องข้อความ */
+            max-width: 400px;
         }
         .alert.fade-out {
             transition: opacity 0.5s ease-out;
             opacity: 0;
         }
     </style>
-    </head>
+
+</head>
 <body>
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
@@ -72,13 +74,14 @@
             {% endif %}
         {% endwith %}
     </div>
+    
     <main class="container-fluid mt-5 mb-5 pt-3">
         {% block content %}{% endblock %}
     </main>
     
     <footer class="footer">
         <div class="container">
-            <span class="text-muted">IOT Stock Chonburi | พัฒนาโดย Artid Wiangkham</span>
+            <span class="text-muted">IOT Stock Chonburi | พัฒนาโดย Thanakorn</span>
         </div>
     </footer>
 
@@ -91,19 +94,16 @@
             const flashMessages = document.querySelectorAll('.flash-messages-container .alert');
 
             flashMessages.forEach((message) => {
-                // ตั้งเวลา 3 วินาที (3000 มิลลิวินาที)
                 setTimeout(() => {
-                    // เพิ่ม class 'fade-out' เพื่อให้ CSS ทำงาน
                     message.classList.add('fade-out');
                     
-                    // เมื่อ animation fade-out จบลง ให้ซ่อน element ไปเลย
                     message.addEventListener('transitionend', () => {
-                        message.remove(); // ใช้ .remove() เพื่อลบออกจาก DOM โดยสมบูรณ์
+                        message.remove();
                     });
 
                 }, 3000); 
             });
         });
     </script>
-    </body>
+</body>
 </html>
