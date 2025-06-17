@@ -5,7 +5,6 @@
 {% block content %}
 <div class="container mt-4">
     
-    <!-- ส่วนสำหรับ เพิ่ม และ แก้ไข สินค้า -->
     <div class="card mb-4" id="product-form-card">
         <div class="card-header">
             <h2 id="form-title">เพิ่มสินค้าใหม่</h2>
@@ -13,7 +12,6 @@
         <div class="card-body">
             <form id="productForm" action="{{ url_for('manage_products') }}" method="POST" enctype="multipart/form-data">
                 
-                <!-- Hidden fields สำหรับบอก action (add/edit) และ ID ของสินค้า -->
                 <input type="hidden" id="form_action" name="action" value="add">
                 <input type="hidden" id="product_id" name="product_id" value="">
 
@@ -29,14 +27,11 @@
                         </div>
                         <div class="mb-3">
                             <label for="product_image_input" class="form-label">อัปโหลดรูปภาพใหม่ (PNG, JPG, GIF):</label>
-                            <!-- ID นี้สำคัญมาก สำหรับฟังก์ชัน Image Preview -->
                             <input type="file" id="product_image_input" name="product_image" class="form-control" accept="image/png, image/jpeg, image/gif">
                         </div>
                     </div>
                     <div class="col-md-4 text-center align-self-center">
-                        <!-- ส่วนแสดงภาพตัวอย่าง -->
                         <label class="form-label">ภาพตัวอย่าง:</label>
-                        <!-- ID นี้สำคัญมาก สำหรับฟังก์ชัน Image Preview -->
                         <img id="image_preview_container" src="https://placehold.co/200x200/eeeeee/aaaaaa?text=Preview" alt="Image Preview" class="img-thumbnail" style="width: 200px; height: 200px; object-fit: cover;">
                     </div>
                 </div>
@@ -44,7 +39,6 @@
                 <hr>
 
                 <div class="d-flex justify-content-end">
-                    <!-- ปุ่มยกเลิกการแก้ไข จะแสดงเมื่ออยู่ในโหมด Edit -->
                     <button type="button" id="cancel-edit-btn" class="btn btn-secondary me-2" style="display: none;">ยกเลิกการแก้ไข</button>
                     <button type="submit" class="btn btn-primary" id="submit-btn">เพิ่มสินค้า</button>
                 </div>
@@ -52,7 +46,6 @@
         </div>
     </div>
 
-    <!-- ส่วนสำหรับแสดงรายการสินค้าหลัก -->
     <div class="card">
         <div class="card-header">
             <h2>รายการสินค้าหลัก</h2>
@@ -80,7 +73,6 @@
                             <td>{{ product.name }}</td>
                             <td>{{ product.mat_code }}</td>
                             <td class="text-end">
-                                <!-- ปุ่ม "แก้ไข" จะเติมข้อมูลลงในฟอร์มด้านบน -->
                                 <button type="button" class="btn btn-sm btn-warning me-2 edit-product-btn" 
                                         data-id="{{ product.id }}"
                                         data-name="{{ product.name }}"
@@ -89,7 +81,6 @@
                                     แก้ไข
                                 </button>
                                 
-                                <!-- ฟอร์ม "ลบ" -->
                                 <form class="delete-product-form" action="{{ url_for('manage_products') }}" method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="product_id" value="{{ product.id }}">
@@ -109,4 +100,45 @@
     </div>
 
 </div>
+{% endblock %}
+
+
+{% block scripts %}
+{{ super() if super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ---- ส่วนของโค้ดสำหรับแสดงภาพตัวอย่าง ----
+    const imageInput = document.getElementById('product_image_input');
+    const imagePreviewContainer = document.getElementById('image_preview_container');
+    
+    // เก็บ URL ของภาพ placeholder เริ่มต้นไว้
+    const defaultImageSrc = imagePreviewContainer.src;
+
+    // เมื่อมีการเลือกไฟล์ใน input
+    imageInput.addEventListener('change', function(event) {
+        const file = event.target.files[0]; // ดึงไฟล์ที่ถูกเลือก
+
+        if (file) {
+            // ถ้ามีไฟล์ถูกเลือก ให้สร้าง FileReader
+            const reader = new FileReader();
+            
+            // กำหนดให้เมื่อ reader อ่านไฟล์เสร็จแล้ว
+            reader.onload = function(e) {
+                // ให้เปลี่ยน src ของแท็ก img เป็นผลลัพธ์ที่อ่านได้
+                imagePreviewContainer.src = e.target.result;
+            }
+            
+            // สั่งให้อ่านไฟล์เป็น Data URL
+            reader.readAsDataURL(file);
+        } else {
+            // ถ้าผู้ใช้กดยกเลิก ให้กลับไปเป็นภาพ placeholder เดิม
+            imagePreviewContainer.src = defaultImageSrc;
+        }
+    });
+
+    // (ส่วนนี้เป็นโค้ดเดิมที่อาจจะมีอยู่ สำหรับปุ่ม Edit/Delete/Cancel)
+    // ... คุณสามารถวางโค้ด JavaScript อื่นๆ ของคุณต่อจากตรงนี้ได้ ...
+
+});
+</script>
 {% endblock %}
