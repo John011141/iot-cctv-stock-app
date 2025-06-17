@@ -148,16 +148,29 @@ def allowed_file(filename):
 # --- Routes ---
 @app.route('/')
 def index():
-    # เปลี่ยนหน้าแรกให้ไปที่หน้าภาพรวมสต็อก
     return redirect(url_for('stock_overview'))
-
-# ฟังก์ชัน /dashboard ถูกลบออกไปแล้ว
 
 @app.route('/stock_overview')
 def stock_overview():
     db = get_db()
-    summary = db.execute("SELECT p.name, p.mat_code, p.image_url, COUNT(CASE WHEN ii.status = 'In Stock' THEN 1 END) AS in_stock_count, COUNT(CASE WHEN ii.status = 'Issued' THEN 1 END) AS issued_count, COUNT(ii.id) AS total_count FROM products p LEFT JOIN inventory_items ii ON p.id = ii.product_id GROUP BY p.id ORDER BY p.name").fetchall()
-    all_items = db.execute("SELECT p.mat_code, ii.serial_number, p.name, ii.status, ii.receiver_name, ii.date_issued, ii.issuer_name FROM inventory_items ii JOIN products p ON ii.product_id = p.id ORDER BY p.mat_code, ii.serial_number").fetchall()
+    # Query เพื่อนับรวม 'ของเสีย' ในยอด 'เบิกจ่ายแล้ว' ถูกต้องแล้ว
+    summary = db.execute("""
+        SELECT p.name, p.mat_code, p.image_url, 
+               COUNT(CASE WHEN ii.status = 'In Stock' THEN 1 END) AS in_stock_count, 
+               COUNT(CASE WHEN ii.status = 'Issued' OR ii.status = 'ของเสีย' THEN 1 END) AS issued_count, 
+               COUNT(ii.id) AS total_count 
+        FROM products p 
+        LEFT JOIN inventory_items ii ON p.id = ii.product_id 
+        GROUP BY p.id 
+        ORDER BY p.name
+    """).fetchall()
+    
+    all_items = db.execute("""
+        SELECT ii.id, p.mat_code, ii.serial_number, p.name, ii.status, 
+               ii.receiver_name, ii.date_issued, ii.issuer_name 
+        FROM inventory_items ii JOIN products p ON ii.product_id = p.id 
+        ORDER BY p.mat_code, ii.serial_number
+    """).fetchall()
     
     technician_summary = db.execute("""
         SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
@@ -182,10 +195,8 @@ def export_csv():
 
     si = io.StringIO()
     cw = csv.writer(si)
-
     header = ["เลข Mat", "SN", "ชื่อสินค้า", "สถานะ", "ผู้รับผิดชอบ (รับเข้า)", "วันที่รับเข้า", "ช่างผู้เบิก", "วันที่เบิกจ่าย"]
     cw.writerow(header)
-
     for item in all_items:
         row = [
             f"=\"{item['mat_code']}\"",
@@ -205,8 +216,7 @@ def export_csv():
     return Response(
         output_bytes,
         mimetype="text/csv",
-        headers={"Content-disposition":
-                 "attachment; filename=stock_export.csv"}
+        headers={"Content-disposition": "attachment; filename=stock_export.csv"}
     )
 
 @app.route('/stock_in', methods=['GET', 'POST'])
@@ -274,7 +284,7 @@ def stock_out():
                     flash(f'Serial Number "{sn}" ไม่พบ, ไม่ตรงกับ Mat Code, หรือไม่ได้อยู่ในสถานะ "In Stock"', 'warning')
             if issued_count > 0:
                 db.commit()
-                flash(f'เบิกจ่ายอุปกรณ์ {issued_count} ชิ้น เรียบร้อยแล้ว!', 'success')
+                flash(f'เบิกจ่ายอุปกรณ์ {issued_count} ชิ้นเรียบร้อยแล้ว!', 'success')
                 update_google_sheet()
             else:
                 flash('ไม่สามารถเบิกจ่ายอุปกรณ์ได้ กรุณาตรวจสอบข้อมูล', 'error')
@@ -285,6 +295,61 @@ def stock_out():
     
     products_in_stock = db.execute("SELECT DISTINCT p.id, p.name, p.mat_code FROM products p JOIN inventory_items ii ON p.id = ii.product_id WHERE ii.status = 'In Stock' ORDER BY p.name").fetchall()
     return render_template('stock_out.html', products=products_in_stock)
+
+# --- START: โค้ดสำหรับรับคืนสินค้า (เวอร์ชันอัปเดตตาม Logic ล่าสุด) ---
+@app.route('/stock_return', methods=['GET', 'POST'])
+def stock_return():
+    db = get_db()
+    if request.method == 'POST':
+        try:
+            # item_id และ action จะถูกส่งมาจากฟอร์มในหน้า stock_return.html
+            item_id = request.form['item_id']
+            action = request.form.get('action') 
+
+            if action == 'return_to_stock':
+                # === นี่คือส่วนที่แก้ไขตามความต้องการล่าสุด ===
+                # คืนของดี: เปลี่ยนสถานะเป็น In Stock และล้างข้อมูลวันที่/ผู้เบิก
+                db.execute(
+                    """UPDATE inventory_items 
+                       SET status = 'In Stock', date_issued = NULL, issuer_name = NULL 
+                       WHERE id = ?""",
+                    (item_id,)
+                )
+                db.commit()
+                flash('รับคืนสินค้า (สภาพดี) เข้าสต็อกเรียบร้อยแล้ว!', 'success')
+
+            elif action == 'mark_defective':
+                # === ส่วนนี้ทำงานถูกต้องตามความต้องการอยู่แล้ว ===
+                # คืนของเสีย: เปลี่ยนสถานะเป็น 'ของเสีย' และเก็บข้อมูลผู้เบิก/วันที่ไว้
+                db.execute(
+                    "UPDATE inventory_items SET status = 'ของเสีย' WHERE id = ?",
+                    (item_id,)
+                )
+                db.commit()
+                flash('บันทึกสินค้าเป็นของเสียเรียบร้อยแล้ว!', 'warning')
+            
+            else:
+                flash('การกระทำไม่ถูกต้อง', 'danger')
+
+            # อัปเดต Google Sheet หลังจากทำรายการเสร็จ
+            update_google_sheet()
+
+        except sqlite3.Error as e:
+            db.rollback()
+            flash(f'เกิดข้อผิดพลาดในการรับคืนสินค้า: {e}', 'error')
+        
+        # ไม่ว่าจะเกิดอะไรขึ้น ให้กลับไปที่หน้าคืนของ
+        return redirect(url_for('stock_return'))
+
+    # สำหรับ GET request, แสดงรายการทั้งหมดที่ถูกเบิกจ่ายไปเพื่อรอการคืน
+    issued_items = db.execute("""
+        SELECT ii.id, ii.serial_number, p.name, ii.issuer_name, ii.date_issued
+        FROM inventory_items ii JOIN products p ON ii.product_id = p.id
+        WHERE ii.status = 'Issued'
+        ORDER BY ii.date_issued DESC
+    """).fetchall()
+    return render_template('stock_return.html', items=issued_items)
+# --- END: โค้ดสำหรับรับคืนสินค้า ---
 
 @app.route('/clear_all_stock', methods=['POST'])
 def clear_all_stock():
