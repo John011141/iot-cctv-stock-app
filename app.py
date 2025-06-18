@@ -8,9 +8,6 @@ from flask import (
     Flask, render_template, request, redirect, url_for, flash, g, current_app, Response
 )
 from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash, check_password_hash # สำหรับเข้ารหัส/ถอดรหัสรหัสผ่าน
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user # สำหรับระบบ Login
-
 import gspread
 
 app = Flask(__name__)
@@ -28,47 +25,6 @@ try:
 except OSError:
     pass
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-
-# --- Flask-Login Setup ---
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login' # กำหนดชื่อฟังก์ชัน route สำหรับหน้า Login
-
-# User class ที่ Flask-Login ต้องการ (ใช้สำหรับจัดการข้อมูลผู้ใช้จาก DB)
-class User(UserMixin):
-    def __init__(self, id, username, password_hash):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-
-    def get_id(self):
-        # Flask-Login ต้องการ ID เป็น string
-        return str(self.id) 
-
-    @staticmethod
-    def get(user_id):
-        # โหลดผู้ใช้จาก ID ที่เก็บใน session (เมื่อ Login แล้ว)
-        db = get_db()
-        user_data = db.execute("SELECT id, username, password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
-        if user_data:
-            return User(user_data['id'], user_data['username'], user_data['password_hash'])
-        return None
-
-    @staticmethod
-    def find_by_username(username):
-        # ค้นหาผู้ใช้จาก username (ตอน Login)
-        db = get_db()
-        user_data = db.execute("SELECT id, username, password_hash FROM users WHERE username = ?", (username,)).fetchone()
-        if user_data:
-            return User(user_data['id'], user_data['username'], user_data['password_hash'])
-        return None
-
-@login_manager.user_loader
-def load_user(user_id):
-    # ฟังก์ชันนี้ถูกเรียกโดย Flask-Login เพื่อโหลด User object จาก user_id
-    # ซึ่ง user_id มาจาก session หลังจากผู้ใช้ Login สำเร็จ
-    return User.get(user_id)
 
 
 # --- Google Sheet Helper Function ---
@@ -161,7 +117,6 @@ def init_db():
     db.executescript("""
         DROP TABLE IF EXISTS inventory_items;
         DROP TABLE IF EXISTS products;
-        DROP TABLE IF EXISTS users; -- <<< เพิ่มตาราง users
 
         CREATE TABLE products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,12 +136,6 @@ def init_db():
             issuer_name TEXT,
             FOREIGN KEY (product_id) REFERENCES products (id)
         );
-
-        CREATE TABLE users ( -- <<< ตารางใหม่สำหรับผู้ใช้
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL
-        );
     """)
 
 @app.cli.command('init-db')
@@ -204,72 +153,9 @@ def allowed_file(filename):
 # --- Routes ---
 @app.route('/')
 def index():
-    # Redirect ผู้ใช้ที่ยังไม่ได้ Login ไปหน้า Login
-    if not current_user.is_authenticated:
-        return redirect(url_for('login'))
     return redirect(url_for('stock_overview'))
 
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # ถ้า Login แล้ว ไปหน้าหลักเลย
-    if current_user.is_authenticated:
-        return redirect(url_for('stock_overview'))
-
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.find_by_username(username)
-
-        if user and check_password_hash(user.password_hash, password):
-            login_user(user) # Login ผู้ใช้
-            flash('เข้าสู่ระบบสำเร็จ!', 'success')
-            next_page = request.args.get('next') # เพื่อ redirect กลับไปหน้าเดิมที่ต้องการเข้าถึง
-            return redirect(next_page or url_for('stock_overview'))
-        else:
-            flash('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 'danger')
-    return render_template('login.html') # ต้องสร้างไฟล์ login.html
-
-
-@app.route('/logout')
-@login_required # ต้อง Login ก่อนถึงจะ Logout ได้
-def logout():
-    logout_user()
-    flash('ออกจากระบบแล้ว', 'info')
-    return redirect(url_for('login'))
-
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    # ถ้า Login แล้ว ไม่ต้องลงทะเบียนซ้ำ
-    if current_user.is_authenticated:
-        return redirect(url_for('stock_overview'))
-
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        db = get_db()
-        existing_user = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-        if existing_user:
-            flash('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว', 'danger')
-        else:
-            # เข้ารหัสรหัสผ่านก่อนบันทึกลง DB
-            hashed_password = generate_password_hash(password)
-            try:
-                db.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, hashed_password))
-                db.commit()
-                flash('ลงทะเบียนสำเร็จ! กรุณาเข้าสู่ระบบ', 'success')
-                return redirect(url_for('login'))
-            except sqlite3.Error as e:
-                db.rollback()
-                flash(f'เกิดข้อผิดพลาดในการลงทะเบียน: {e}', 'danger')
-    return render_template('register.html') # ต้องสร้างไฟล์ register.html
-
-
-# --- ป้องกันหน้าอื่นๆ ที่ต้อง Login ก่อนเข้าถึง ---
 @app.route('/stock_overview')
-@login_required # <<< เพิ่ม @login_required เพื่อบังคับให้ Login ก่อนเข้าถึงหน้านี้
 def stock_overview():
     db = get_db()
     # Query เพื่อนับรวม 'ของเสีย' ในยอด 'เบิกจ่ายแล้ว' ถูกต้องแล้ว
@@ -284,7 +170,7 @@ def stock_overview():
         ORDER BY p.name
     """).fetchall()
     
-    # === SQL Query เพื่อเรียงลำดับข้อมูลสำหรับตารางทั้งหมด (ในหน้าเว็บ) ===
+    # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับตารางทั้งหมด (ในหน้าเว็บ) ===
     all_items = db.execute("""
         SELECT ii.id, p.mat_code, ii.serial_number, p.name, ii.status, 
                ii.receiver_name, ii.date_issued, ii.issuer_name 
@@ -295,7 +181,7 @@ def stock_overview():
             p.mat_code,                                        -- หากวันที่เบิกจ่ายเดียวกัน ให้เรียงตาม Mat Code
             ii.serial_number                                   -- หาก Mat Code เดียวกัน ให้เรียงตาม Serial Number
     """).fetchall()
-    # === END: SQL Query ===
+    # === END: แก้ไข SQL Query ===
     
     technician_summary = db.execute("""
         SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
@@ -309,7 +195,6 @@ def stock_overview():
                            technician_summary=technician_summary)
 
 @app.route('/export_csv')
-@login_required # <<< ป้องกัน
 def export_csv():
     db = get_db()
     # === ปรับ ORDER BY ตรงนี้ให้เหมือนกับ stock_overview เพื่อให้ CSV เรียงตามวันที่เบิกจ่ายด้วย ===
@@ -351,7 +236,6 @@ def export_csv():
     )
 
 @app.route('/stock_in', methods=['GET', 'POST'])
-@login_required # <<< ป้องกัน
 def stock_in():
     db = get_db()
     if request.method == 'POST':
@@ -391,7 +275,6 @@ def stock_in():
     return render_template('stock_in.html', products=products)
 
 @app.route('/stock_out', methods=['GET', 'POST'])
-@login_required # <<< ป้องกัน
 def stock_out():
     db = get_db()
     if request.method == 'POST':
@@ -431,7 +314,6 @@ def stock_out():
 
 # --- START: โค้ดสำหรับรับคืนสินค้า (เวอร์ชันอัปเดตตาม Logic ล่าสุด) ---
 @app.route('/stock_return', methods=['GET', 'POST'])
-@login_required # <<< ป้องกัน
 def stock_return():
     db = get_db()
     if request.method == 'POST':
@@ -483,7 +365,6 @@ def stock_return():
 # --- END: โค้ดสำหรับรับคืนสินค้า ---
 
 @app.route('/clear_all_stock', methods=['POST'])
-@login_required # <<< ป้องกัน
 def clear_all_stock():
     db = get_db()
     try:
@@ -497,7 +378,6 @@ def clear_all_stock():
     return redirect(url_for('stock_overview'))
 
 @app.route('/manage_products', methods=['GET', 'POST'])
-@login_required # <<< ป้องกัน
 def manage_products():
     db = get_db()
     if request.method == 'POST':
