@@ -33,29 +33,52 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <nav class="navbar navbar-expand-lg navbar-dark fixed-top bg-dark"> {# เพิ่ม bg-dark ตรงนี้เพื่อให้ Navbar มีสีพื้นหลัง #}
             <div class="container-fluid">
-                <a class="navbar-brand" href="{{ url_for('stock_overview') }}">IOT Stock Chonburi</a>
+                {# แก้ไข href ให้ไปที่ url_for('index') ซึ่งจะจัดการ redirect ไป login/stock_overview #}
+                <a class="navbar-brand" href="{{ url_for('index') }}">IOT Stock Chonburi</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('stock_overview') }}">ภาพรวมสต็อก</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('stock_in') }}">รับสินค้าเข้า</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('stock_out') }}">เบิก-จ่ายอุปกรณ์</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('stock_return') }}">รับคืนสินค้า</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('manage_products') }}">จัดการสินค้าหลัก</a>
-                        </li>
+                    {# ลิงก์เมนูด้านซ้าย (ถ้ามี) หรืออาจจะเป็นเมนูหลักที่แสดงเมื่อ Login แล้ว #}
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0"> {# ใช้ me-auto แทน ms-auto เพื่อให้ไปอยู่ซ้ายสุด #}
+                        {# แสดงลิงก์เมนูหลักเฉพาะเมื่อผู้ใช้ Login แล้ว #}
+                        {% if current_user.is_authenticated %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('stock_overview') }}">ภาพรวมสต็อก</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('stock_in') }}">รับสินค้าเข้า</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('stock_out') }}">เบิก-จ่ายอุปกรณ์</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('stock_return') }}">รับคืนสินค้า</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('manage_products') }}">จัดการสินค้าหลัก</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                    {# ลิงก์ Login/Register/Logout และ Username #}
+                    <ul class="navbar-nav"> {# ไม่ต้องใช้ ms-auto ตรงนี้ เพราะต้องการให้ชิดขวา #}
+                        {% if current_user.is_authenticated %}
+                            <li class="nav-item">
+                                <span class="nav-link text-white">สวัสดี, <strong>{{ current_user.username }}</strong></span>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('logout') }}">ออกจากระบบ</a>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('login') }}">เข้าสู่ระบบ</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('register') }}">ลงทะเบียน</a>
+                            </li>
+                        {% endif %}
                     </ul>
                 </div>
             </div>
@@ -66,7 +89,8 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {# ปรับ class ของ alert ให้ตรงกับ category ที่ Flask-Login ส่งมา (เช่น 'success', 'danger', 'info', 'warning') #}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
@@ -75,6 +99,7 @@
         {% endwith %}
     </div>
     
+    {# ปรับ mt-5 เป็น mt-4 หรือ mt-0 เนื่องจากมี fixed-top navbar แล้ว และ pt-3 จะทำให้เนื้อหาไม่ชนกับ Navbar #}
     <main class="container-fluid mt-5 mb-5 pt-3">
         {% block content %}{% endblock %}
     </main>
@@ -90,20 +115,20 @@
     {% block scripts %}{% endblock %}
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const flashMessages = document.querySelectorAll('.flash-messages-container .alert');
+    document.addEventListener('DOMContentLoaded', () => {
+        const flashMessages = document.querySelectorAll('.flash-messages-container .alert');
 
-            flashMessages.forEach((message) => {
-                setTimeout(() => {
-                    message.classList.add('fade-out');
-                    
-                    message.addEventListener('transitionend', () => {
-                        message.remove();
-                    });
+        flashMessages.forEach((message) => {
+            setTimeout(() => {
+                message.classList.add('fade-out');
+                
+                message.addEventListener('transitionend', () => {
+                    message.remove();
+                });
 
-                }, 3000); 
-            });
+            }, 3000); // 3000 มิลลิวินาที = 3 วินาที
         });
-    </script>
+    });
+</script>
 </body>
 </html>
