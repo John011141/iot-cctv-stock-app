@@ -1,5 +1,3 @@
-# app.py
-
 import sqlite3
 import os
 import uuid
@@ -48,7 +46,7 @@ def update_google_sheet():
         # --- 1. อัปเดตชีตหลัก (ข้อมูลทั้งหมด) ---
         main_worksheet = spreadsheet.sheet1
         
-        # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับ Google Sheet (เรียงจากเก่าไปใหม่) ===
+        # === SQL Query เพื่อเรียงลำดับข้อมูลสำหรับ Google Sheet (เรียงจากเก่าไปใหม่) ===
         all_items = db.execute("""
             SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                    ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
@@ -59,7 +57,7 @@ def update_google_sheet():
                 p.mat_code,                                        -- 3. หากวันเดียวกัน ให้เรียงตามเลข Mat
                 ii.serial_number                                   -- 4. หาก Mat เดียวกัน ให้เรียงตาม SN
         """).fetchall()
-        # === END: แก้ไข SQL Query ===
+        # === END: SQL Query ===
 
         header = ["เลข Mat", "SN", "ชื่อสินค้า", "สถานะ", "ผู้รับผิดชอบ (รับเข้า)", "วันที่รับเข้า", "ช่างผู้เบิก", "วันที่เบิกจ่าย"]
         data_to_write = [header] + [[
@@ -172,12 +170,18 @@ def stock_overview():
         ORDER BY p.name
     """).fetchall()
     
+    # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับตารางทั้งหมด (ในหน้าเว็บ) ===
     all_items = db.execute("""
         SELECT ii.id, p.mat_code, ii.serial_number, p.name, ii.status, 
                ii.receiver_name, ii.date_issued, ii.issuer_name 
         FROM inventory_items ii JOIN products p ON ii.product_id = p.id 
-        ORDER BY p.mat_code, ii.serial_number
+        ORDER BY 
+            CASE WHEN ii.date_issued IS NULL THEN 1 ELSE 0 END, -- ทำให้รายการที่ยังไม่มีวันที่เบิกจ่ายไปอยู่ท้ายสุด
+            ii.date_issued ASC,                                -- เรียงตามวันที่เบิกจ่ายจากน้อยไปมาก
+            p.mat_code,                                        -- หากวันที่เบิกจ่ายเดียวกัน ให้เรียงตาม Mat Code
+            ii.serial_number                                   -- หาก Mat Code เดียวกัน ให้เรียงตาม Serial Number
     """).fetchall()
+    # === END: แก้ไข SQL Query ===
     
     technician_summary = db.execute("""
         SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
@@ -193,12 +197,16 @@ def stock_overview():
 @app.route('/export_csv')
 def export_csv():
     db = get_db()
-    # For CSV export, let's keep the original sorting unless specified otherwise
+    # === ปรับ ORDER BY ตรงนี้ให้เหมือนกับ stock_overview เพื่อให้ CSV เรียงตามวันที่เบิกจ่ายด้วย ===
     all_items = db.execute("""
         SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
         FROM inventory_items ii JOIN products p ON ii.product_id = p.id
-        ORDER BY p.mat_code, ii.serial_number
+        ORDER BY 
+            CASE WHEN ii.date_issued IS NULL THEN 1 ELSE 0 END, 
+            ii.date_issued ASC,                               
+            p.mat_code,                                        
+            ii.serial_number                                   
     """).fetchall()
 
     si = io.StringIO()
