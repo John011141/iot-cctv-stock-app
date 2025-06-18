@@ -48,18 +48,16 @@ def update_google_sheet():
         # --- 1. อัปเดตชีตหลัก (ข้อมูลทั้งหมด) ---
         main_worksheet = spreadsheet.sheet1
         
-        # === START: แก้ไข SQL Query เพื่อเรียงลำดับข้อมูลสำหรับ Google Sheet (เรียงจากเก่าไปใหม่) ===
         all_items = db.execute("""
             SELECT p.mat_code, ii.serial_number, p.name, ii.status,
                    ii.receiver_name, ii.date_received, ii.issuer_name, ii.date_issued
             FROM inventory_items ii JOIN products p ON ii.product_id = p.id
             ORDER BY 
-                CASE WHEN ii.date_issued IS NULL THEN 1 ELSE 0 END, -- 1. จัดกลุ่มรายการที่ยังไม่เบิกไปไว้ข้างล่าง
-                ii.date_issued ASC,                                -- 2. เรียงตามวันที่เบิกจ่ายจากเก่าสุดไปใหม่สุด
-                p.mat_code,                                        -- 3. หากวันเดียวกัน ให้เรียงตามเลข Mat
-                ii.serial_number                                   -- 4. หาก Mat เดียวกัน ให้เรียงตาม SN
+                CASE WHEN ii.date_issued IS NULL OR ii.date_issued = '' THEN 1 ELSE 0 END,
+                ii.date_issued ASC,                               
+                p.mat_code,                                       
+                ii.serial_number                                  
         """).fetchall()
-        # === END: แก้ไข SQL Query ===
 
         header = ["เลข Mat", "SN", "ชื่อสินค้า", "สถานะ", "ผู้รับผิดชอบ (รับเข้า)", "วันที่รับเข้า", "ช่างผู้เบิก", "วันที่เบิกจ่าย"]
         data_to_write = [header] + [[
@@ -172,12 +170,19 @@ def stock_overview():
         ORDER BY p.name
     """).fetchall()
     
+    # ==================== START: แก้ไขจุดนี้ ====================
+    # แก้ไข ORDER BY ให้เรียงตามวันที่เบิกจ่าย (date_issued) เป็นหลัก
     all_items = db.execute("""
         SELECT ii.id, p.mat_code, ii.serial_number, p.name, ii.status, 
                ii.receiver_name, ii.date_issued, ii.issuer_name 
         FROM inventory_items ii JOIN products p ON ii.product_id = p.id 
-        ORDER BY p.mat_code, ii.serial_number
+        ORDER BY 
+            CASE WHEN ii.date_issued IS NULL OR ii.date_issued = '' THEN 1 ELSE 0 END, 
+            ii.date_issued ASC,
+            p.mat_code ASC,
+            ii.serial_number ASC
     """).fetchall()
+    # ===================== END: แก้ไขจุดนี้ =====================
     
     technician_summary = db.execute("""
         SELECT issuer_name, COUNT(id) AS item_count FROM inventory_items
