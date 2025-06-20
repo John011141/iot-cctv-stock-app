@@ -5,6 +5,17 @@
 {% block content %}
 <div class="container mt-4">
     
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     <div class="card mb-4" id="product-form-card">
         <div class="card-header">
             <h2 id="form-title">เพิ่มสินค้าใหม่</h2>
@@ -32,7 +43,7 @@
                     </div>
                     <div class="col-md-4 text-center align-self-center">
                         <label class="form-label">ภาพตัวอย่าง:</label>
-                        <img id="image_preview_container" src="https://placehold.co/200x200/eeeeee/aaaaaa?text=Preview" alt="Image Preview" class="img-thumbnail" style="width: 200px; height: 200px; object-fit: cover;">
+                        <img id="image_preview_container" src="{{ url_for('static', filename='images/placeholder.png') }}" alt="Image Preview" class="img-thumbnail" style="width: 200px; height: 200px; object-fit: cover;">
                     </div>
                 </div>
                 
@@ -65,7 +76,7 @@
                         {% for product in products %}
                         <tr>
                             <td>
-                                <img src="{{ product.image_url or 'https://placehold.co/100x100/eeeeee/aaaaaa?text=No+Image' }}" 
+                                <img src="{{ product.image_url or url_for('static', filename='images/placeholder.png') }}" 
                                      alt="{{ product.name }}" 
                                      class="img-fluid rounded" 
                                      style="width: 80px; height: 80px; object-fit: cover;">
@@ -110,35 +121,86 @@ document.addEventListener('DOMContentLoaded', function() {
     // ---- ส่วนของโค้ดสำหรับแสดงภาพตัวอย่าง ----
     const imageInput = document.getElementById('product_image_input');
     const imagePreviewContainer = document.getElementById('image_preview_container');
-    
-    // เก็บ URL ของภาพ placeholder เริ่มต้นไว้
     const defaultImageSrc = imagePreviewContainer.src;
 
-    // เมื่อมีการเลือกไฟล์ใน input
     imageInput.addEventListener('change', function(event) {
-        const file = event.target.files[0]; // ดึงไฟล์ที่ถูกเลือก
-
+        const file = event.target.files[0];
         if (file) {
-            // ถ้ามีไฟล์ถูกเลือก ให้สร้าง FileReader
             const reader = new FileReader();
-            
-            // กำหนดให้เมื่อ reader อ่านไฟล์เสร็จแล้ว
             reader.onload = function(e) {
-                // ให้เปลี่ยน src ของแท็ก img เป็นผลลัพธ์ที่อ่านได้
                 imagePreviewContainer.src = e.target.result;
             }
-            
-            // สั่งให้อ่านไฟล์เป็น Data URL
             reader.readAsDataURL(file);
         } else {
-            // ถ้าผู้ใช้กดยกเลิก ให้กลับไปเป็นภาพ placeholder เดิม
             imagePreviewContainer.src = defaultImageSrc;
         }
     });
 
-    // (ส่วนนี้เป็นโค้ดเดิมที่อาจจะมีอยู่ สำหรับปุ่ม Edit/Delete/Cancel)
-    // ... คุณสามารถวางโค้ด JavaScript อื่นๆ ของคุณต่อจากตรงนี้ได้ ...
+    // ==========================================================
+    // ===== ส่วนที่เพิ่มเข้ามา: จัดการปุ่ม แก้ไข, ยกเลิก, และยืนยันการลบ =====
+    // ==========================================================
+    const productForm = document.getElementById('productForm');
+    const formTitle = document.getElementById('form-title');
+    const submitBtn = document.getElementById('submit-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const formActionInput = document.getElementById('form_action');
+    const productIdInput = document.getElementById('product_id');
+    const matCodeInput = document.getElementById('mat_code');
 
+    // --- จัดการการคลิกปุ่ม "แก้ไข" ---
+    document.querySelectorAll('.edit-product-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const id = this.dataset.id;
+            const name = this.dataset.name;
+            const matCode = this.dataset.mat_code;
+            const imageUrl = this.dataset.image_url;
+
+            // นำข้อมูลไปใส่ในฟอร์ม
+            formTitle.textContent = 'แก้ไขข้อมูลสินค้า';
+            productForm.querySelector('#name').value = name;
+            matCodeInput.value = matCode;
+            // ทำให้ เลข Mat. แก้ไขไม่ได้ตอน edit เพื่อความปลอดภัยของข้อมูล
+            matCodeInput.readOnly = true; 
+            imagePreviewContainer.src = imageUrl || defaultImageSrc;
+            
+            formActionInput.value = 'edit';
+            productIdInput.value = id;
+
+            // เปลี่ยนปุ่ม
+            submitBtn.textContent = 'บันทึกการแก้ไข';
+            submitBtn.classList.remove('btn-primary');
+            submitBtn.classList.add('btn-success');
+            cancelBtn.style.display = 'inline-block';
+
+            // เลื่อนหน้าจอขึ้นไปที่ฟอร์ม
+            document.getElementById('product-form-card').scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+
+    // --- จัดการการคลิกปุ่ม "ยกเลิกการแก้ไข" ---
+    cancelBtn.addEventListener('click', function() {
+        formTitle.textContent = 'เพิ่มสินค้าใหม่';
+        productForm.reset(); 
+        imagePreviewContainer.src = defaultImageSrc;
+        
+        formActionInput.value = 'add';
+        productIdInput.value = '';
+        matCodeInput.readOnly = false; // ทำให้กลับมาแก้ไขได้เหมือนเดิม
+
+        submitBtn.textContent = 'เพิ่มสินค้า';
+        submitBtn.classList.remove('btn-success');
+        submitBtn.classList.add('btn-primary');
+        cancelBtn.style.display = 'none';
+    });
+
+    // --- จัดการการ submit ฟอร์มลบ (เพิ่มการยืนยัน) ---
+    document.querySelectorAll('.delete-product-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบสินค้านี้? การกระทำนี้ไม่สามารถย้อนกลับได้')) {
+                e.preventDefault(); 
+            }
+        });
+    });
 });
 </script>
 {% endblock %}
